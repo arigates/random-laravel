@@ -32,7 +32,7 @@ class ProductController extends Controller
 
         return DataTables::eloquent($products)
             ->addColumn('action', function ($data) {
-                $btnEdit = '<a href="'.route('products.edit', ['product' => $data->id]).'" class="btn btn-primary btn-sm">Edit</a>';
+                $btnEdit = '<button data-id="'.$data->id.'" class="btn btn-primary btn-sm btn-edit">Edit</button>';
                 $btnDelete = '<button data-id="'.$data->id.'" class="btn btn-danger btn-sm ml-2 btn-delete">Hapus</button>';
 
                 return $btnEdit.$btnDelete;

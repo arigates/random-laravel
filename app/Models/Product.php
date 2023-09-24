@@ -26,4 +26,9 @@ class Product extends Model
         'min_price',
         'max_price',
     ];
+
+    protected $casts = [
+        'min_price' => 'int',
+        'max_price' => 'int',
+    ];
 }

@@ -81,6 +81,54 @@
             </div>
         </div>
     </div>
+
+    <!-- Modal Edit -->
+    <div class="modal fade" id="modal-edit">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Edit Data Produk</h4>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                </div>
+                <form id="form-edit" action="#" method="POST">
+                    <div class="modal-body">
+                        @csrf
+                        <input type="hidden" id="id" name="id">
+                        <div class="form-group">
+                            <label for="name_edit">Nama Produk</label>
+                            <input type="text" id="name_edit" class="form-control" placeholder="Nama Produk" name="name" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="min_price_edit">Harga Awal</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Rp</span>
+                                </div>
+                                <input id="min_price_edit" type="text" class="form-control float-right" placeholder="Harga Awal" name="min_price" required>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max_price_edit">Harga Batas</label>
+                            <div class="input-group">
+                                <div class="input-group-prepend">
+                                    <span class="input-group-text">Rp</span>
+                                </div>
+                                <input id="max_price_edit" type="text" class="form-control float-right" placeholder="Harga Batas" name="max_price" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Tutup</button>
+                        <button type="submit" class="btn btn-primary">Simpan <i id="spinner-edit" style="display: none" class="fas fa-spinner fa-spin"></i></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @stop
 
 @section('js')
@@ -103,7 +151,7 @@
                 ],
             })
 
-            $('#min_price, #max_price').inputmask("currency", {
+            $('#min_price, #max_price, #min_price_edit, #max_price_edit').inputmask("currency", {
                 radixPoint: ",",
                 groupSeparator: ".",
                 digits: 0,
@@ -140,6 +188,53 @@
                 $('#spinner-insert').hide();
                 // $('#modal-insert').modal('hide');
             });
+        })
+
+        $('#datatable').on('click', '.btn-edit', function () {
+            let id = $(this).data('id')
+            let link = '{{ route('products.show', ['product' => ':product']) }}'
+            link = link.replace(':product', id)
+
+            $('#form-edit').attr('action', link)
+
+            $.ajax({
+                url: link,
+                type: 'GET',
+                dataType: 'json',
+            })
+            .done(function(data) {
+                console.log(data)
+                $.each(data, function(index, el) {
+                    $('#'+index+'_edit').val(el);
+                });
+            })
+            .always(function() {
+                $('#modal-edit').modal('show');
+            });
+        })
+
+        $('#form-edit').submit(function (e) {
+            e.preventDefault()
+
+            $('#spinner-edit').show();
+            let url = $(this).attr('action')
+            $.ajax({
+                url: url,
+                type: 'PATCH',
+                dataType: 'json',
+                data: $(this).serializeArray(),
+            })
+                .done(function(data) {
+                    table.ajax.reload();
+                    $('#modal-edit').modal('hide');
+                })
+                .fail(function(data) {
+                    console.log(data)
+                })
+                .always(function() {
+                    $('#spinner-edit').hide();
+                    // $('#modal-insert').modal('hide');
+                });
         })
     </script>
 @stop

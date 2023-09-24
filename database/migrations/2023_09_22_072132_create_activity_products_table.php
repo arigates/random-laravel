@@ -18,7 +18,7 @@ class CreateActivityProductsTable extends Migration
             $table->unsignedBigInteger('activity_id');
             $table->unsignedBigInteger('product_id');
             $table->integer('qty');
-            $table->decimal('price');
+            $table->decimal('price', 15, 2);
             $table->timestamps();
         });
     }

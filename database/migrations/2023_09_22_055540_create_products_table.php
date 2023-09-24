@@ -16,8 +16,8 @@ class CreateProductsTable extends Migration
         Schema::create('products', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->decimal('min_price')->default(0);
-            $table->decimal('max_price')->default(0);
+            $table->decimal('min_price', 15, 2)->default(0);
+            $table->decimal('max_price', 15, 2)->default(0);
             $table->timestamps();
             $table->softDeletes();
         });
