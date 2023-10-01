@@ -132,8 +132,13 @@
 @stop
 
 @section('js')
-    <script src="{{ asset('/vendor/maskInput/jquery.mask.min.js') }}"></script>
     <script type="text/javascript">
+        $.ajaxSetup({
+            headers: {
+                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+            }
+        });
+
         let table = null
         $(document).ready(function(){
             table = $('#datatable').DataTable({
@@ -203,7 +208,6 @@
                 dataType: 'json',
             })
             .done(function(data) {
-                console.log(data)
                 $.each(data, function(index, el) {
                     $('#'+index+'_edit').val(el);
                 });
@@ -224,17 +228,50 @@
                 dataType: 'json',
                 data: $(this).serializeArray(),
             })
-                .done(function(data) {
-                    table.ajax.reload();
-                    $('#modal-edit').modal('hide');
-                })
-                .fail(function(data) {
-                    console.log(data)
-                })
-                .always(function() {
-                    $('#spinner-edit').hide();
-                    // $('#modal-insert').modal('hide');
-                });
+            .done(function(data) {
+                table.ajax.reload();
+                $('#modal-edit').modal('hide');
+            })
+            .fail(function(data) {
+                console.log(data)
+            })
+            .always(function() {
+                $('#spinner-edit').hide();
+            });
+        })
+
+        $('#datatable').on('click', '.btn-delete', function () {
+            let id = $(this).data('id')
+            let link = '{{ route('products.destroy', ['product' => ':product']) }}'
+            link = link.replace(':product', id)
+
+            Swal.fire({
+                title: 'Anda yakin?',
+                text: "Data yang dihapus tidak bisa dikembalikan!",
+                type: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                cancelButtonText: 'Batalkan',
+                confirmButtonText: 'Ya, hapus!'
+            }).then((result) => {
+                if (result.value) {
+                    $.ajax({
+                        url: link,
+                        type: 'DELETE',
+                        dataType: 'json',
+                    })
+                    .done(function(data) {
+                        table.ajax.reload();
+
+                        Swal.fire(
+                            'Data terhapus!',
+                            'Data berhasil dihapus.',
+                            'success'
+                        )
+                    })
+                }
+            })
         })
     </script>
 @stop
