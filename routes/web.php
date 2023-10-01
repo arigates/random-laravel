@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -22,3 +23,4 @@ Route::get('/', [App\Http\Controllers\HomeController::class, 'index'])->name('ho
 
 Route::get('/products/datatable', [ProductController::class, 'datatable'])->name('products.data');
 Route::resource('products', ProductController::class)->middleware('auth');
+Route::resource('activities', ActivityController::class)->middleware('auth');
