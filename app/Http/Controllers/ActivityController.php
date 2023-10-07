@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Product;
 use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Http\Request;
 
@@ -24,7 +25,9 @@ class ActivityController extends Controller
      */
     public function create(): Renderable
     {
-        return view('activity.create');
+        $products = Product::all();
+
+        return view('activity.create', compact('products'));
     }
 
     /**
