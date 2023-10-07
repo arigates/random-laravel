@@ -23,4 +23,5 @@ Route::get('/', [App\Http\Controllers\HomeController::class, 'index'])->name('ho
 
 Route::get('/products/datatable', [ProductController::class, 'datatable'])->name('products.data');
 Route::resource('products', ProductController::class)->middleware('auth');
+Route::get('/activities/datatable', [ActivityController::class, 'datatable'])->name('activities.data');
 Route::resource('activities', ActivityController::class)->middleware('auth');

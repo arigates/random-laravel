@@ -16,7 +16,6 @@ use Illuminate\Database\Eloquent\Model;
  * @property float $min_price
  * @property float $max_price
  */
-
 class Product extends Model
 {
     use HasFactory;

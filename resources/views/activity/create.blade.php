@@ -49,7 +49,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="document">Dokumen</label>
-                                <input type="file" id="dokumen" class="form-control" placeholder="Dokumen" name="document" required>
+                                <input type="file" id="document" class="form-control" placeholder="Dokumen" name="document" required>
                             </div>
                         </div>
                     </div>
@@ -58,7 +58,7 @@
                             <div class="col-md-4">
                                 <div class="form-group">
                                     <label for="product">Pilih Produk</label>
-                                    <select id="product" class="form-control select2" style="width: 100%;" required>
+                                    <select id="product" class="form-control select2" name="product_id" style="width: 100%;" required>
                                         <option value="">--Pilih Produk--</option>
                                         @foreach($products as $product)
                                             <option value="{{ $product->id }}"
@@ -199,9 +199,9 @@
 
         function recalculateCart() {
             $('#cart-table').html('')
-            let i = 0;
+
             let total = 0;
-            for (let cart of carts) {
+            carts.forEach((cart, i) => {
                 let price = cart.price;
                 let subtotal = Number(price.replace('.', '')) * cart.qty;
                 let subtotalFormatted = subtotal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
@@ -210,14 +210,44 @@
                 let row = `<tr><td>${cart.product_name}</td><td>${cart.price}</td><td>${cart.qty}</td><td>${subtotalFormatted}</td><td><button onclick="deleteCart(${i})" class="btn btn-sm btn-danger">Hapus</button></td></tr>`
 
                 $('#cart-table').append(row)
-
-                i++;
-            }
+            })
 
             if (carts.length > 0) {
                 let totalFormatted = total.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
                 $('#cart-table').append(`<tr><td colspan="3">Total</td><td>${totalFormatted}</td><td></td></tr>`)
             }
         }
+
+        $('#save-data').click(function() {
+            let data = new FormData()
+            if (typeof $('#document')[0].files[0] !== 'undefined') {
+                data.append('document', $('#document')[0].files[0])
+            }
+            data.append('description', $('#description').val())
+            data.append('budget', $('#budget').val())
+            data.append('date', $('#date').val())
+            carts.forEach((cart, i) => {
+                data.append(`details[${i}][product_id]`, cart.product_id)
+                data.append(`details[${i}][price]`, cart.price)
+                data.append(`details[${i}][qty]`, cart.qty)
+            })
+
+            $.ajax({
+                type: "POST",
+                url: '{{ route('activities.store') }}',
+                data: data,
+                contentType: false,
+                cache: false,
+                processData:false,
+            }).done(function(data) {
+
+            })
+            .fail(function(data) {
+                console.log(data)
+            })
+            .always(function() {
+
+            });
+        })
     </script>
 @stop

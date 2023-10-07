@@ -14,12 +14,10 @@ class CreateActivityProductsTable extends Migration
     public function up()
     {
         Schema::create('activity_products', function (Blueprint $table) {
-            $table->id();
             $table->unsignedBigInteger('activity_id');
             $table->unsignedBigInteger('product_id');
             $table->integer('qty');
             $table->decimal('price', 15, 2);
-            $table->timestamps();
         });
     }
 
