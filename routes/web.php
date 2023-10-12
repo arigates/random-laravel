@@ -21,7 +21,17 @@ Auth::routes([
 
 Route::get('/', [App\Http\Controllers\HomeController::class, 'index'])->name('home');
 
-Route::get('/products/datatable', [ProductController::class, 'datatable'])->name('products.data');
+Route::get('/products/datatable', [ProductController::class, 'datatable'])
+    ->name('products.data')
+    ->middleware('auth');
 Route::resource('products', ProductController::class)->middleware('auth');
-Route::get('/activities/datatable', [ActivityController::class, 'datatable'])->name('activities.data');
-Route::resource('activities', ActivityController::class)->middleware('auth');
+
+Route::get('/activities/datatable', [ActivityController::class, 'datatable'])
+    ->name('activities.data')
+    ->middleware('auth');
+Route::resource('activities', ActivityController::class)
+    ->except(['show', 'update'])
+    ->middleware('auth');
+Route::post('/activities/{activity}/update', [ActivityController::class, 'update'])
+    ->name('activities.update')
+    ->middleware('auth');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ActivityCreateRequest;
+use App\Http\Requests\ActivityUpdateRequest;
 use App\Models\Activity;
 use App\Models\Product;
 use Exception;
@@ -10,8 +11,11 @@ use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Throwable;
 use Yajra\DataTables\Facades\DataTables;
+use function PHPUnit\Framework\throwException;
 
 class ActivityController extends Controller
 {
@@ -34,7 +38,8 @@ class ActivityController extends Controller
 
         return DataTables::eloquent($activities)
             ->addColumn('action', function ($data) {
-                $btnEdit = '<button data-id="'.$data->id.'" class="btn btn-primary btn-sm btn-edit">Edit</button>';
+                $url = route('activities.edit', ['activity' => $data->id]);
+                $btnEdit = '<a href="'.$url.'" class="btn btn-primary btn-sm btn-edit">Edit</a>';
                 $btnDelete = '<button data-id="'.$data->id.'" class="btn btn-danger btn-sm ml-2 btn-delete">Hapus</button>';
 
                 return $btnEdit.$btnDelete;
@@ -70,73 +75,167 @@ class ActivityController extends Controller
      */
     public function store(ActivityCreateRequest $request): JsonResponse
     {
-        $activity = new Activity();
-        $activity->description = $request->description;
-        $activity->date = $request->date;
-        $activity->budget = $request->budget;
-        if ($request->hasFile('document')) {
-            $fileName = $request->file('document')->getClientOriginalName();
-            $request->file('document')->storePubliclyAs('public/documents', $fileName);
+        DB::beginTransaction();
+        try {
+            $activity = new Activity();
+            $activity->description = $request->description;
+            $activity->date = $request->date;
+            $activity->budget = $request->budget;
+            if ($request->hasFile('document')) {
+                $fileName = $request->file('document')->getClientOriginalName();
+                $request->file('document')->storePubliclyAs('public/documents', $fileName);
 
-            $activity->document = $fileName;
+                $activity->document = $fileName;
+            }
+            $activity->save();
+
+            $products = [];
+            foreach ($request->details as $detail) {
+                $productId = $detail['product_id'];
+                $price = $detail['price'];
+                $product = Product::findOrFail($productId);
+                if ($price < $product->min_price) {
+                    DB::rollBack();
+
+                    return response()->json(['message' => 'Harga lebih kecil dari batas harga bawah'], 400);
+                }
+
+                if ($price > $product->max_price) {
+                    DB::rollBack();
+
+                    return response()->json(['message' => 'Harga lebih kecil dari batas harga atas'], 400);
+                }
+
+                $products[$detail['product_id']] = [
+                    'qty' => $detail['qty'],
+                    'price' => $detail['price'],
+                ];
+            }
+
+            $activity->products()->attach($products);
+
+            DB::commit();
+
+            return response()->json($activity, 201);
+        } catch (Throwable $t) {
+            DB::rollBack();
+
+            return response()->json(['message' => $t->getMessage()], 400);
         }
-        $activity->save();
-
-        $products = [];
-        foreach ($request->details as $detail) {
-            $products[$detail['product_id']] = [
-                'qty' => $detail['qty'],
-                'price' => $detail['price'],
-            ];
-        }
-
-        $activity->products()->attach($products);
-
-        return response()->json($activity);
-    }
-
-    /**
-     * Display the specified resource.
-     *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
-     */
-    public function show($id)
-    {
-        //
     }
 
     /**
      * Show the form for editing the specified resource.
      *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @param int $id
+     * @return Renderable
      */
-    public function edit($id)
+    public function edit(int $id): Renderable
     {
-        //
+        $activity = Activity::with('products')->findOrFail($id);
+        $activity->budget = number_format($activity->budget,0,',','.');
+        $products = Product::all();
+        $carts = [];
+        foreach ($activity->products as $product) {
+            $carts[] = [
+                'product_id' => $product->id,
+                'product_name' => $product->name,
+                'qty' => $product->pivot->qty,
+                'price' => number_format($product->pivot->price,0,',','.'),
+            ];
+        }
+
+        return view('activity.edit', compact('activity', 'products', 'carts'));
     }
 
     /**
      * Update the specified resource in storage.
      *
-     * @param Request $request
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @param ActivityUpdateRequest $request
+     * @param int $id
+     * @return JsonResponse
      */
-    public function update(Request $request, $id)
+    public function update(ActivityUpdateRequest $request, int $id): JsonResponse
     {
-        //
+        DB::beginTransaction();
+        try {
+            $activity = Activity::findOrFail($id);
+            $activity->description = $request->description;
+            $activity->date = $request->date;
+            $activity->budget = $request->budget;
+            if ($request->hasFile('document')) {
+                $fileName = $request->file('document')->getClientOriginalName();
+                $request->file('document')->storePubliclyAs('public/documents', $fileName);
+
+                if ($activity->document) {
+                    Storage::disk('public')->delete('/documents/'.$activity->document);
+                }
+
+                $activity->document = $fileName;
+            }
+
+            $activity->save();
+
+            $activity->products()->detach();
+
+            $products = [];
+            foreach ($request->details as $detail) {
+                $productId = $detail['product_id'];
+                $price = $detail['price'];
+                $product = Product::findOrFail($productId);
+                if ($price < $product->min_price) {
+                    DB::rollBack();
+
+                    return response()->json(['message' => 'Harga lebih kecil dari batas harga bawah'], 400);
+                }
+
+                if ($price > $product->max_price) {
+                    DB::rollBack();
+
+                    return response()->json(['message' => 'Harga lebih kecil dari batas harga atas'], 400);
+                }
+
+                $products[$detail['product_id']] = [
+                    'qty' => $detail['qty'],
+                    'price' => $detail['price'],
+                ];
+            }
+
+            $activity->products()->attach($products);
+
+            DB::commit();
+
+            return response()->json($activity, 201);
+        } catch (Throwable $t) {
+            DB::rollBack();
+
+            return response()->json(['message' => $t->getMessage()], 400);
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      *
-     * @param  int  $id
-     * @return \Illuminate\Http\Response
+     * @param int $id
+     * @return JsonResponse
      */
-    public function destroy($id)
+    public function destroy(int $id): JsonResponse
     {
-        //
+        DB::beginTransaction();
+        try {
+            $activity = Activity::findOrFail($id);
+            $activity->products()->detach();
+            if ($activity->document) {
+                Storage::disk('public')->delete('/documents/'.$activity->document);
+            }
+            $activity->delete();
+            DB::commit();
+
+            return response()->json('Delete success');
+        } catch (Throwable $t) {
+            DB::rollBack();
+
+            return response()->json(['message' => $t->getMessage()], 400);
+        }
     }
 }

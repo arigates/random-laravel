@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Auth;
  * @property mixed $document
  * @property array $details
  */
-class ActivityCreateRequest extends FormRequest
+class ActivityUpdateRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.

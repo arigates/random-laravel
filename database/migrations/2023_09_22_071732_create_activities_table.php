@@ -16,7 +16,7 @@ class CreateActivitiesTable extends Migration
         Schema::create('activities', function (Blueprint $table) {
             $table->id();
             $table->string('description');
-            $table->decimal('budget')->default(0);
+            $table->decimal('budget', 15, 2)->default(0);
             $table->date('date');
             $table->string('document')->nullable();
             $table->timestamps();

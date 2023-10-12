@@ -1,9 +1,9 @@
 @extends('adminlte::page')
 
-@section('title', 'Tambah Kegiatan')
+@section('title', 'Edit Kegiatan')
 
 @section('content_header')
-    <h1>Tambah Kegiatan</h1>
+    <h1>Edit Kegiatan</h1>
 @stop
 
 @section('content')
@@ -24,7 +24,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="description">Deskripsi Kegiatan</label>
-                                <input type="text" id="description" class="form-control" placeholder="Deskripsi Kegiatan" name="description" required>
+                                <input type="text" id="description" class="form-control" placeholder="Deskripsi Kegiatan" name="description" value="{{ $activity->description }}" required>
                                 <div id="description-feedback" class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -35,7 +35,7 @@
                                     <div class="input-group-prepend">
                                         <span class="input-group-text">Rp</span>
                                     </div>
-                                    <input id="budget" type="text" class="form-control float-right" placeholder="Budget" name="budget" required>
+                                    <input id="budget" type="text" class="form-control float-right" placeholder="Budget" name="budget" value="{{ $activity->budget }}" required>
                                     <div id="budget-feedback" class="invalid-feedback"></div>
                                 </div>
                             </div>
@@ -45,7 +45,7 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="date">Tanggal Kegiatan</label>
-                                <input type="date" id="date" class="form-control" placeholder="Tanggal Kegiatan" name="date" required>
+                                <input type="date" id="date" class="form-control" placeholder="Tanggal Kegiatan" name="date" value="{{ $activity->date }}" required>
                                 <div id="date-feedback" class="invalid-feedback"></div>
                             </div>
                         </div>
@@ -103,13 +103,13 @@
                         <div class="col-md-12">
                             <table class="table table-bordered">
                                 <thead>
-                                    <tr>
-                                        <th>Nama Produk</th>
-                                        <th>Harga</th>
-                                        <th>Kuantiti</th>
-                                        <th>Subtotal</th>
-                                        <th>Aksi</th>
-                                    </tr>
+                                <tr>
+                                    <th>Nama Produk</th>
+                                    <th>Harga</th>
+                                    <th>Kuantiti</th>
+                                    <th>Subtotal</th>
+                                    <th>Aksi</th>
+                                </tr>
                                 </thead>
                                 <tbody id="cart-table">
 
@@ -134,6 +134,8 @@
             }
         });
 
+        let carts = @json($carts);
+
         $(document).ready(function(){
             let select2 = $('.select2').select2();
             select2.data('select2').$selection.css('height', '38px');
@@ -146,6 +148,8 @@
                 prefix: '', //Space after $, this will not truncate the first character.
                 rightAlign: false,
             });
+
+            recalculateCart();
         })
 
         $('#product').change(function (){
@@ -170,7 +174,6 @@
             $('#price').focus()
         })
 
-        let carts = [];
         $('#form-cart').submit(function (e) {
             e.preventDefault()
 
@@ -240,9 +243,12 @@
                 data.append(`details[${i}][qty]`, cart.qty)
             })
 
+            let link = '{{ route('activities.update', ['activity' => ':activity']) }}'
+            link = link.replace(':activity', '{{ $activity->id }}')
+
             $.ajax({
                 type: "POST",
-                url: '{{ route('activities.store') }}',
+                url: link,
                 data: data,
                 contentType: false,
                 cache: false,
