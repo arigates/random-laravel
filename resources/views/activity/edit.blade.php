@@ -57,51 +57,9 @@
                             </div>
                         </div>
                     </div>
-                    <form id="form-cart" action="#">
-                        <div class="row mt-2">
-                            <div class="col-md-4">
-                                <div class="form-group">
-                                    <label for="product">Pilih Produk</label>
-                                    <select id="product" class="form-control select2" name="product_id" style="width: 100%;" required>
-                                        <option value="">--Pilih Produk--</option>
-                                        @foreach($products as $product)
-                                            <option value="{{ $product->id }}"
-                                                    data-min-price="{{ $product->min_price }}"
-                                                    data-max-price="{{ $product->max_price }}"
-                                                    data-product-name="{{ $product->name }}">
-                                                {{ $product->name }}
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="price">Harga</label>
-                                    <div class="input-group">
-                                        <div class="input-group-prepend">
-                                            <span class="input-group-text">Rp</span>
-                                        </div>
-                                        <input id="price" type="text" class="form-control float-right" placeholder="Harga" name="price" required>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-3">
-                                <div class="form-group">
-                                    <label for="qty">Jumlah</label>
-                                    <input type="number" id="qty" class="form-control" placeholder="Jumlah barang" name="qty" required>
-                                </div>
-                            </div>
-                            <div class="col-md-2">
-                                <label class="text-white">.</label>
-                                <button type="submit" class="btn btn-primary btn-block">Tambah Data</button>
-                            </div>
-                        </div>
-                    </form>
-
                     <div class="row">
                         <div class="col-md-12">
-                            <table class="table table-bordered">
+                            <table class="table table-bordered" id="cart-table">
                                 <thead>
                                 <tr>
                                     <th>Nama Produk</th>
@@ -111,14 +69,19 @@
                                     <th>Aksi</th>
                                 </tr>
                                 </thead>
-                                <tbody id="cart-table">
-
+                                <tbody>
+                                <tr>
+                                    <td colspan="3" class="text-bold">Total</td>
+                                    <td id="total">0</td>
+                                    <td></td>
+                                </tr>
                                 </tbody>
                             </table>
                         </div>
                         <div class="col-md-12">
                             <p class="text-center text-danger" id="details-feedback"></p>
                         </div>
+                        <button type="button" class="btn btn-primary btn-block" id="btn-add-cart">Tambah Data</button>
                     </div>
                 </div>
             </div>
@@ -134,12 +97,25 @@
             }
         });
 
-        let carts = @json($carts);
+        // keep select2 focus
+        // on first focus (bubbles up to document), open the menu
+        $(document).on('focus', '.select2-selection.select2-selection--single', function (e) {
+            $(this).closest(".select2-container").siblings('select:enabled').select2('open');
+        });
+
+        // steal focus during close - only capture once and stop propogation
+        $('select.select2').on('select2:closing', function (e) {
+            $(e.target).data("select2").$selection.one('focus focusin', function (e) {
+                e.stopPropagation();
+            });
+        });
+
+        let products = @json($products);
+        let budget = '{{ $activity->budget }}';
+        budget = Number(budget.replace(/\./g, ''))
+        let total = 0;
 
         $(document).ready(function(){
-            let select2 = $('.select2').select2();
-            select2.data('select2').$selection.css('height', '38px');
-
             $('#budget, #price').inputmask("currency", {
                 radixPoint: ",",
                 groupSeparator: ".",
@@ -148,19 +124,140 @@
                 prefix: '', //Space after $, this will not truncate the first character.
                 rightAlign: false,
             });
-
-            recalculateCart();
         })
 
-        $('#product').change(function (){
-            if ($(this).val() === '') {
+        $('#budget').change(function () {
+            budget = Number($(this).val().replace(/\./g, ''))
+        })
+
+        let i = 0
+        let oldCarts = @json($carts);
+        if (oldCarts.length > 0) {
+            oldCarts.forEach((cart, t) => {
+                let productOptions = `<option value="">--Pilih Produk--</option>`;
+                products.forEach((product, i) => {
+                    productOptions += `<option value="${product.id}" data-min-price="${product.min_price}" data-max-price="${product.max_price}">${product.name}</option>`
+                })
+
+                let subtotal = Number(cart.price.replace(/\./g, '')) * cart.qty;
+                let subtotalFormatted = subtotal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+                let row = `<tr class=".cart-row">`+
+                    `<td><select class="form-control select2 input-product" id="input-product-${i}" name="product[]" onChange="setInputPrice(this)">${productOptions}</select></td>`+
+                    `<td><input type="text" class="form-control input-price" id="input-price-${i}" value="${cart.price}" onkeydown="setQty(event, this)" name="price[]"/></td>`+
+                    `<td><input type="number" class="form-control input-qty" id="input-qty-${i}" value="${cart.qty}" onkeydown="setSubtotal(event, this)"  name="qty[]"/></td>`+
+                    `<td class="subtotal" id="subtotal-${i}">${subtotalFormatted}</td>`+
+                    `<td><button class="btn btn-sm btn-danger btn-delete-cart">Hapus</button></td>`+
+                    `</tr>`;
+
+                $('#cart-table > tbody:last-child').before(row)
+
+                $(`#input-product-${i}`).val(cart.product_id)
+
+                let product = products.find(product => product.id === cart.product_id);
+
+                $(`#input-price-${i}`).inputmask("currency", {
+                    radixPoint: ",",
+                    groupSeparator: ".",
+                    digits: 0,
+                    autoGroup: true,
+                    prefix: '', //Space after $, this will not truncate the first character.
+                    rightAlign: false,
+                    min: product.min_price,
+                    max: product.max_price,
+                });
+
+                i++;
+            })
+
+            $('.select2').select2();
+            $('.select2').each(function() {
+                if ($(this).data('select2')) {
+                    $(this).data('select2').$selection.css('height', '38px');
+                }
+            });
+
+            calculateTotal()
+        }
+
+
+        $('#btn-add-cart').click(function () {
+            if (budget === 0) {
+                Swal.fire(
+                    'Error!',
+                    "input budget terlebih dahulu",
+                    'error'
+                )
+
                 return
             }
 
-            let minPrice = $(this).find(':selected').data('min-price')
-            let maxPrice = $(this).find(':selected').data('max-price')
+            if (total > budget) {
+                Swal.fire(
+                    'Error!',
+                    "total sudah melebihi budget",
+                    'error'
+                )
 
-            $('#price').inputmask("currency", {
+                return
+            }
+
+            let productOptions = `<option value="">--Pilih Produk--</option>`;
+            products.forEach((product, i) => {
+                productOptions += `<option value="${product.id}" data-min-price="${product.min_price}" data-max-price="${product.max_price}">${product.name}</option>`
+            })
+
+            let row = `<tr class=".cart-row">`+
+                `<td><select class="form-control select2 input-product" id="input-product-${i}" name="product[]" onChange="setInputPrice(this)">${productOptions}</select></td>`+
+                `<td><input type="text" class="form-control input-price" id="input-price-${i}" onkeydown="setQty(event, this)" name="price[]"/></td>`+
+                `<td><input type="number" class="form-control input-qty" id="input-qty-${i}" onkeydown="setSubtotal(event, this)"  name="qty[]"/></td>`+
+                `<td class="subtotal" id="subtotal-${i}"></td>`+
+                `<td><button class="btn btn-sm btn-danger btn-delete-cart">Hapus</button></td>`+
+                `</tr>`;
+
+            $('#cart-table > tbody:last-child').before(row)
+
+            $('.select2').select2();
+            $('.select2').each(function() {
+                if ($(this).data('select2')) {
+                    $(this).data('select2').$selection.css('height', '38px');
+                }
+            });
+
+            $(`#input-product-${i}`).focus();
+            i++;
+        })
+
+        function setInputPrice(selector) {
+            let productId = $(selector).val();
+            let found = 0;
+            $('#cart-table tr:gt(0)').each(function () {
+                let inputProduct = $(this).find('.input-product')[0] || null;
+                if (inputProduct !== null && inputProduct.value === productId) {
+                    found++;
+                }
+            })
+
+            if (found > 1) {
+                $(selector).val('').trigger('change');
+
+                Swal.fire(
+                    'Error!',
+                    "Produk duplikat",
+                    'error'
+                )
+
+                return
+            }
+
+            let minPrice = $(selector).find(':selected').data('min-price')
+            let maxPrice = $(selector).find(':selected').data('max-price')
+
+            const row = selector.closest('tr');
+            let inputPrice = row.querySelector('.input-price')
+            let inputPriceId = inputPrice.getAttribute('id')
+
+            $(`#${inputPriceId}`).inputmask("currency", {
                 radixPoint: ",",
                 groupSeparator: ".",
                 digits: 0,
@@ -171,65 +268,116 @@
                 max: maxPrice,
             });
 
-            $('#price').focus()
-        })
+            window.setTimeout(function () {
+                $(`#${inputPriceId}`).focus();
+            }, 0);
 
-        $('#form-cart').submit(function (e) {
-            e.preventDefault()
+            subtotal(row)
+        }
 
-            let values = $(this).serializeArray()
-            let form = {
-                product_name: $('#product').find(':selected').data('product-name')
-            };
-            for (let value of values) {
-                form[value.name] = value.value
+        function setQty(event, selector) {
+            if (event.key === "Enter") {
+                const row = selector.closest('tr');
+                let inputQty = row.querySelector('.input-qty');
+                let inputQtyId = inputQty.getAttribute('id');
+
+                $(`#${inputQtyId}`).focus();
+
+                subtotal(row)
             }
+        }
 
-            carts.push(form)
-            recalculateCart()
+        function setSubtotal(event, selector) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                const row = selector.closest('tr');
+                subtotal(row)
 
-            $("#form-cart")[0].reset()
-            $('#product').val('').trigger('change');
-            $('#price').inputmask("currency", {
-                radixPoint: ",",
-                groupSeparator: ".",
-                digits: 0,
-                autoGroup: true,
-                prefix: '', //Space after $, this will not truncate the first character.
-                rightAlign: false,
-                min: 0,
-                max: 0,
+                // do validation
+                if (calculateTotal()) {
+                    $('#btn-add-cart').trigger('click')
+                } else {
+                    Swal.fire(
+                        'Error!',
+                        "total sudah melebihi budget",
+                        'error'
+                    )
+                }
+            }
+        }
+
+        function subtotal(row) {
+            let inputPrice = row.querySelector('.input-price');
+            let inputQty = row.querySelector('.input-qty');
+            let inputSubtotal = row.querySelector('.subtotal');
+            let inputSubtotalId = inputSubtotal.getAttribute('id');
+
+            let price = inputPrice.value;
+            let qty = inputQty.value;
+
+            let subtotal = Number(price.replace(/\./g, '')) * qty;
+            let subtotalFormatted = subtotal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+
+            $(`#${inputSubtotalId}`).text(subtotalFormatted)
+        }
+
+        function calculateTotal() {
+            total = 0
+            $('#cart-table tr:gt(0)').each(function () {
+                let inputPrice = $(this).find('.input-price')[0] || null;
+                let inputQty = $(this).find('.input-qty')[0] || null;
+
+                if (inputPrice !== null && inputQty !== null) {
+                    let price = inputPrice.value;
+                    let qty = inputQty.value;
+
+                    let subtotal = Number(price.replace(/\./g, '')) * qty;
+                    total += subtotal
+                }
             });
-        })
 
-        function deleteCart(i) {
-            carts.splice(i, 1)
-            recalculateCart()
-        }
+            if (total > 0) {
+                if (total > budget) {
+                    return false
+                }
 
-        function recalculateCart() {
-            $('#cart-table').html('')
-
-            let total = 0;
-            carts.forEach((cart, i) => {
-                let price = cart.price;
-                let subtotal = Number(price.replace('.', '')) * cart.qty;
-                let subtotalFormatted = subtotal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                total += subtotal
-
-                let row = `<tr><td>${cart.product_name}</td><td>${cart.price}</td><td>${cart.qty}</td><td>${subtotalFormatted}</td><td><button onclick="deleteCart(${i})" class="btn btn-sm btn-danger">Hapus</button></td></tr>`
-
-                $('#cart-table').append(row)
-            })
-
-            if (carts.length > 0) {
-                $('#details-feedback').text('');
                 let totalFormatted = total.toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-                $('#cart-table').append(`<tr><td colspan="3">Total</td><td>${totalFormatted}</td><td></td></tr>`)
+                $('#total').text(totalFormatted)
             }
+
+            return true
         }
+
+        $('#cart-table').on('click', '.btn-delete-cart', function (){
+            $(this).closest('tr').remove();
+
+            calculateTotal();
+        })
 
         $('#save-data').click(function() {
+            // get row value add to carts
+            let carts = [];
+            $('#cart-table tr:gt(0)').each(function () {
+                let inputProduct = $(this).find('.input-product')[0] || null;
+                let inputPrice = $(this).find('.input-price')[0] || null;
+                let inputQty = $(this).find('.input-qty')[0] || null;
+
+                if (inputProduct !== null && inputPrice !== null && inputQty !== null) {
+                    let productId = inputProduct.value;
+                    let price = inputPrice.value;
+                    let qty = inputQty.value;
+
+                    if (productId !== '' && price !== '' && qty !== 0) {
+                        carts.push({
+                            product_id: productId,
+                            price: price,
+                            qty: qty,
+                        })
+                    }
+                }
+            });
+
+
             let data = new FormData()
             if (typeof $('#document')[0].files[0] !== 'undefined') {
                 data.append('document', $('#document')[0].files[0])

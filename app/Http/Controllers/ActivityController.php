@@ -62,7 +62,16 @@ class ActivityController extends Controller
      */
     public function create(): Renderable
     {
-        $products = Product::all();
+        $rows = Product::all();
+        $products = [];
+        foreach ($rows as $row) {
+            $products[] = [
+                'id' => $row->id,
+                'name' => $row->name,
+                'min_price' => $row->min_price,
+                'max_price' => $row->max_price,
+            ];
+        }
 
         return view('activity.create', compact('products'));
     }
@@ -90,6 +99,7 @@ class ActivityController extends Controller
             $activity->save();
 
             $products = [];
+            $total = 0;
             foreach ($request->details as $detail) {
                 $productId = $detail['product_id'];
                 $price = $detail['price'];
@@ -110,6 +120,14 @@ class ActivityController extends Controller
                     'qty' => $detail['qty'],
                     'price' => $detail['price'],
                 ];
+
+                $total += ($detail['qty'] * $detail['price']);
+            }
+
+            if ($total > $activity->budget) {
+                DB::rollBack();
+
+                return response()->json(['message' => 'Total melebihi budget'], 400);
             }
 
             $activity->products()->attach($products);
@@ -134,12 +152,20 @@ class ActivityController extends Controller
     {
         $activity = Activity::with('products')->findOrFail($id);
         $activity->budget = number_format($activity->budget,0,',','.');
-        $products = Product::all();
+        $rows = Product::all();
+        $products = [];
+        foreach ($rows as $row) {
+            $products[] = [
+                'id' => $row->id,
+                'name' => $row->name,
+                'min_price' => $row->min_price,
+                'max_price' => $row->max_price,
+            ];
+        }
         $carts = [];
         foreach ($activity->products as $product) {
             $carts[] = [
                 'product_id' => $product->id,
-                'product_name' => $product->name,
                 'qty' => $product->pivot->qty,
                 'price' => number_format($product->pivot->price,0,',','.'),
             ];
@@ -179,6 +205,7 @@ class ActivityController extends Controller
             $activity->products()->detach();
 
             $products = [];
+            $total = 0;
             foreach ($request->details as $detail) {
                 $productId = $detail['product_id'];
                 $price = $detail['price'];
@@ -199,6 +226,14 @@ class ActivityController extends Controller
                     'qty' => $detail['qty'],
                     'price' => $detail['price'],
                 ];
+
+                $total += ($detail['qty'] * $detail['price']);
+            }
+
+            if ($total > $activity->budget) {
+                DB::rollBack();
+
+                return response()->json(['message' => 'Total melebihi budget'], 400);
             }
 
             $activity->products()->attach($products);
